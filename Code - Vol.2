@@ -1,0 +1,128 @@
+{
+Stage 1   :  From separator to inlet
+Stage 2   :  Turbine exit
+Stage 3   :  Mixing process of ammonia-rich solution and ammonia-weak
+Stage 4   :  LTR to condenser
+Stage 5   :  LTR to pump
+Stage 6   :  Pump to LTR
+Stage 7   :  LTR to HTR
+Stage 8   :  HTR to boiler
+Stage 9   :  From Boiler to Separator
+Stage 10 :  Separator to HT Recuperator
+Stage 11 :  HT Recuperator to Expansion Valve
+Stage 12 : After Expansion valve - Before mixing of weak & rich solutions
+}
+
+"Input Parameters' Assumptions"
+T[9] = 460 "K" "Maximum temperature reached in boiler"
+P[9] = 60 "Bar" "Pressure of working fluid going through turbine inlet"
+x[9] = 0,75 " Ammonia mass fraction"
+T[5] = 283 "Temperature at Conderser outlet"
+TTD = 12,4 "Terminal Temperature Difference" " T[3] - T[7] = TTD"
+
+
+mdot[1] = 15   "kg/s" "Mass flow rate throug turbine inlet"
+mdot[2] = mdot[1]
+mdot[10] = 10 "kg/s" "Mass flow rate of weak mixture"
+mdot[9] = mdot[1] + mdot[10]
+
+
+
+"Calculation Stage 9"
+Call NH3H2O(123; T[9]; P[9]; x[9]: T_9; P_9;  x_9; h[9]; s[9]; u[9]; v[9]; Qu[9])
+
+
+"Calculating Stage 1"
+T[1] = T[9]
+P[1] = P[9]
+Qu[1] = 1
+Call NH3H2O(128; T[1]; P[1]; Qu[1]: T_1; P_1; x[1]; h[1]; s[1]; u[1]; v[1]; Qu_1)
+
+
+"Calculating Stage 2"
+P[2] = 2 "bar"
+x[2] = x[1]
+Call NH3H2O(235;  P[2]; x[2];  s[1] : T[2]; P_2; x_2; his[2]; sis[2]; uis[2]; v[2]; Qu[2])
+
+
+"Power Production in Turbine"
+eff_turb = 0,75 " Turbine Efficienct = 75%"
+h[2] = h[1] - (eff_turb*(h[1]-his[2]))
+Poweroutput_turbine = mdot[1]*(h[1]-h[2]) "kJ/s = kW"
+
+"Calculating Stage 10"
+Qu10 = 0
+Call NH3H2O(128;  T[9]; P[9];  Qu10 : T[10]; P[10]; x[10]; h[10]; s[10]; u[10]; v[10]; Qu[10])
+
+"Calculating Stage 3"
+mdot[3] = mdot[9]
+T[3] = T[2]                             " !!! How can we assume or know T[3] ?? For know I Assume it is equal to T[2] "
+P[3] = P[2]
+x[3] = x[9]
+Call NH3H2O(123; T[3]; P[3]; x[3] : T_3;P_3;x_3;h[3];s[3];u[3];v[3];Qu[3])
+
+
+"Calculating Stage 12"
+mdot[12] = mdot[10]
+h[12] = (mdot[3]*h[3] - mdot[2]*h[2]) / mdot[12]
+P[12] = P[2]
+x[12] = x[10]
+Call NH3H2O(234; P[12];x[12];h[12] : T[12];P_12 ; x_12 ; h_12 ; s[12] ; u[12] ; v[12] ; Qu[12])
+
+"Stage 11"
+mdot[11] = mdot[10]
+h[11] = h[12]  "Isentropic Valve"
+P[11] = P[1]
+x[11] = x[10]
+Call NH3H2O(234; P[11] ; x[11] ; h[11] :  T[11] ; P_11 ; x_11 ; h_11 ; s[11] ; u[11] ; v[11] ; Qu[11])
+
+"Calculating Stage 7"
+T[7] = T[3] - TTD
+P[7] = P[9]
+x[7] =x[9]
+Call NH3H2O(123; T[7] ; P[7] ; x[7]  :  T_7 ; P_7 ; x_7 ; h[7] ; s[7] ; u[7] ; v[7] ; Qu[7])
+mdot[7] = mdot[9]
+
+{
+Calculating Stage 8
+
+Stage 10 properties have already known, stage 11 has also calculated so now the amount of heat & energy transfer in HTR is defined
+According to heat exchanger model
+
+mdot[10]*(h[10] - h[11]) = mdot[7]*(h[8]-h[7])
+}
+x[8] = x[9]
+mdot[8] = mdot[9]
+h[8] = (mdot[10] * ( h[10] - h[11] )  + mdot[8]*h[7] )  /  mdot[8]
+P[8] = P[9]
+Call NH3H2O(234 ; P[8] ; x[8] ; h[8]  :  T[8] ; P_8 ; x_8 ; h_8 ; s[8] ; u[8] ; v[8] ; Qu[8])
+
+
+"Calculating Stage 5"
+	"T[5] is known"
+x[5]  = x[9]
+P[5] = P[2]
+Call NH3H2O(123; T[5] ; P[5] ; x[5]  :  T_5 ; P_5 ; x_5 ; h[5] ; s[5] ; u[5] ; v[5] ; Qu[5])
+mdot[5] = mdot[9]
+
+"Calculating Stage 6"
+"Pump assummed to work isentropically"
+P[6] = 60 
+x[6] = x[9]
+sis[6] = s[5] "Isentropic Compression"
+Call NH3H2O (235 ; P[6] ; x[6] ; sis[6]  :  T[6] ; P_6 ; x_6 ; his[6] ; sis_6 ; uis[6] ; v[6] ; Qu[6]) 
+mdot[6] = mdot[9]
+
+"Calculating Required Pump Power Input"
+"Assuming Pump works with 80% efficiency"
+eff_pump = 0,8
+h[6] = (  (his[6] - h[5])  + eff_pump * h[5]   ) / eff_pump
+Powerinput_pump = mdot[5] * ( h[6]  -  h[5] )
+
+"Calculating Stage 4"
+
+mdot[4] = mdot[3]
+h[4] = (mdot[3] * h[3]  -  mdot[6] *  ( h[7] - h[6] ) ) / mdot[4]
+P[4] = P[2]
+x[4] = x[9]
+Call NH3H2O(234 ; P[4] ; x[4] ; h[4]  :  T[4] ; P_4 ; x_4 ; h_4 ; s[4] ; u[4] ; v[4] ; Qu[4])
